@@ -2,6 +2,34 @@ from conans import ConanFile, CMake, tools,MSBuild, AutoToolsBuildEnvironment
 from shutil import copyfile
 import os
 from conanos.build import config_scheme
+
+
+
+
+def replace_file(input , output, var={}):
+    '''Copies an <input> file to an <output> file and substitutes variable values in var
+    '''
+    f = open(input)
+    content = open(input).read()
+    f.close()
+
+    lines = []
+    for line in content.splitlines():
+        for key ,val in var.items():
+            line = line.replace(key,val)
+        lines.append(line)
+
+    try:
+        os.makedirs(os.path.dirname(output))
+    except:
+        pass
+
+    f = open(output,'w')
+    f.write("\n".join(lines))
+    f.close()
+
+
+
 class LibtheoraConan(ConanFile):
     name = "libtheora"
     version = "1.1.1"
@@ -9,7 +37,7 @@ class LibtheoraConan(ConanFile):
     url = "https://github.com/conanos/libtheora"
     homepage = 'https://www.theora.org/'
     license = "BSD"
-    exports = ["LICENSE.md"]
+    exports = ["LICENSE.md",'theora.def']
     settings = "os", "compiler", "build_type", "arch"
     options = {"shared": [True, False]}
     default_options = "shared=True"
@@ -28,14 +56,18 @@ class LibtheoraConan(ConanFile):
         config_scheme(self)
 
     def source(self):
-        #url_ = 'http://downloads.xiph.org/releases/theora/{name}-{version}.tar.gz'.format(name=self.name, version=self.version)
-        #tools.get(url_)
+        url_ = 'http://downloads.xiph.org/releases/theora/{name}-{version}.tar.gz'.format(name=self.name, version=self.version)
+        tools.get(url_)
         #extracted_dir = self.name + "-" + self.version
         #os.rename(extracted_dir, self.source_subfolder)
 
-        with tools.chdir(os.path.join(self.source_subfolder, 'lib')):
-            # file somehow missed in distribution
-            tools.download('https://raw.githubusercontent.com/xiph/theora/master/lib/theora.def', 'theora.def')
+        def_ =os.path.join(self.source_subfolder, 'lib','theora.def')
+        if not os.path.exists(def_):
+            copyfile('theora.def',def_)
+
+        #with tools.chdir(os.path.join(self.source_subfolder, 'lib')):
+        #    # file somehow missed in distribution
+        #    tools.download('https://raw.githubusercontent.com/xiph/theora/master/lib/theora.def', 'theora.def')
 
 
 
@@ -51,9 +83,9 @@ class LibtheoraConan(ConanFile):
 
     def build_msvc(self):
         # error C2491: 'rint': definition of dllimport function not allowed
-        #tools.replace_in_file(os.path.join(self.source_subfolder, 'examples', 'encoder_example.c'),
-        #                      'static double rint(double x)',
-        #                      'static double rint_(double x)')
+        tools.replace_in_file(os.path.join(self.source_subfolder, 'examples', 'encoder_example.c'),
+                              'static double rint(double x)',
+                              'static double rint_(double x)')
 
         def format_libs(libs):
             return ' '.join([l + '.lib' for l in libs])
@@ -125,12 +157,26 @@ class LibtheoraConan(ConanFile):
         if tools.os_info.is_linux:
             with tools.chdir(self.source_subfolder):
                 self.copy("*", src="%s/builddir"%(os.getcwd()))
-                
+
         if self.settings.compiler == 'Visual Studio':
             include_folder = os.path.join(self.source_subfolder, "include")
             self.copy(pattern="*.h", dst="include", src=include_folder)
             self.copy(pattern="*.dll", dst="bin", keep_path=False)
             self.copy(pattern="*.lib", dst="lib", keep_path=False)
+
+            replace_file(os.path.join(self.source_subfolder,'theora.pc.in'),
+                         os.path.join(self.package_folder,'lib/pkgconfig/theora.pc'),
+                         var={'@prefix@':os.path.abspath(self.package_folder).replace("\\", "/").lower(),
+                              '@exec_prefix@':r'${prefix}/bin',
+                              '@libdir@':r'${prefix}/lib',
+                              '@includedir@':r'${prefix}/include',
+                              '@VERSION@':'1.2.3'})
+
+
     def package_info(self):
         self.cpp_info.libs = tools.collect_libs(self)
+
+
+
+
 
