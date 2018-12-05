@@ -13,7 +13,7 @@ class LibtheoraConan(ConanFile):
     generators = "cmake"
     settings = "os", "compiler", "build_type", "arch"
     options = {"shared": [True, False], "fPIC": [True, False]}
-    default_options = { 'shared': False, 'fPIC': True }
+    default_options = { 'shared': True, 'fPIC': True }
     _source_subfolder = "source_subfolder"
     _build_subfolder = "build_subfolder"
     requires = "libogg/1.3.3@conanos/stable", "libvorbis/1.3.6@conanos/stable"
